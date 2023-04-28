@@ -30,8 +30,8 @@ deepspeed --master_port 12346 main.py \
    --actor_model_name_or_path $ACTOR_MODEL_PATH \
    --critic_model_name_or_path $CRITIC_MODEL_PATH \
    --num_padding_at_beginning 1 \
-   --per_device_train_batch_size 4 \
-   --per_device_mini_train_batch_size 4 \
+   --per_device_train_batch_size 1 \
+   --per_device_mini_train_batch_size 1 \
    --generation_batch_numbers 1 \
    --ppo_epochs 1 \
    --max_answer_seq_len 256 \
@@ -46,6 +46,8 @@ deepspeed --master_port 12346 main.py \
    --num_warmup_steps 100 \
    --deepspeed --seed 1234 \
    --enable_hybrid_engine \
+   --release_inference_cache \
+   --offload_reference_model \
    --actor_zero_stage $ACTOR_ZERO_STAGE \
    --critic_zero_stage $CRITIC_ZERO_STAGE \
    --output_dir $OUTPUT \

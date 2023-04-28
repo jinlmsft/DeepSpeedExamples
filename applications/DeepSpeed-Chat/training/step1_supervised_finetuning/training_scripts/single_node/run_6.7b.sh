@@ -30,5 +30,7 @@ deepspeed main.py \
    --gradient_checkpointing \
    --zero_stage $ZERO_STAGE \
    --deepspeed \
+   --offload \
+   --zero_stage 3 \
    --output_dir $OUTPUT \
    &> $OUTPUT/training.log
