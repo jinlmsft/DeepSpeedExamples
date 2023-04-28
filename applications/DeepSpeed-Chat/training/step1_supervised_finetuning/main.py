@@ -46,9 +46,14 @@ def parse_args():
                         type=str,
                         default='6,2,2',
                         help='Comma-separated list of proportions for training'
-                        'phase 1, 2, and 3 data. For example the split `2,4,4`'
+                        'phase 1, 2, and 3 data. For example the split `6,2,2`'
                         'will use 60% of data for phase 1, 20% for phase 2'
                         'and 20% for phase 3.')
+    parser.add_argument(
+        '--sft_only_data_path',
+        nargs='*',
+        default=[],
+        help='Path to the dataset for only using in SFT phase.')
     parser.add_argument(
         '--data_output_path',
         type=str,
@@ -90,7 +95,7 @@ def parse_args():
     )
     parser.add_argument("--weight_decay",
                         type=float,
-                        default=0.1,
+                        default=0.,
                         help="Weight decay to use.")
     parser.add_argument("--num_train_epochs",
                         type=int,
@@ -133,6 +138,9 @@ def parse_args():
     parser.add_argument('--gradient_checkpointing',
                         action='store_true',
                         help='Enable HF gradient checkpointing for model.')
+    parser.add_argument('--disable_dropout',
+                        action='store_true',
+                        help='Disable the dropout of the model.')
     # deepspeed features
     parser.add_argument('--offload',
                         action='store_true',
@@ -161,7 +169,7 @@ def parse_args():
     if args.gradient_checkpointing and args.lora_dim > 0:
         assert (
             not args.only_optimize_lora
-        ), "--gradient_checkpointing and --only_optimizer_lora cannot be enabled at the same time."
+        ), "--gradient_checkpointing and --only_optimize_lora cannot be enabled at the same time."
 
     return args
 
@@ -199,8 +207,11 @@ def main():
                                               fast_tokenizer=True)
     tokenizer.pad_token = tokenizer.eos_token
 
-    model = create_hf_model(AutoModelForCausalLM, args.model_name_or_path,
-                            tokenizer, ds_config)
+    model = create_hf_model(AutoModelForCausalLM,
+                            args.model_name_or_path,
+                            tokenizer,
+                            ds_config,
+                            disable_dropout=args.disable_dropout)
 
     if args.lora_dim > 0:
         model = convert_linear_layer_to_lora(model, args.lora_module_name,
@@ -211,9 +222,15 @@ def main():
     # Prepare the data
     train_phase = 1
     train_dataset, eval_dataset = create_prompt_dataset(
-        args.local_rank, args.data_path, args.data_split,
-        args.data_output_path, train_phase, args.seed, tokenizer,
-        args.max_seq_len)
+        args.local_rank,
+        args.data_path,
+        args.data_split,
+        args.data_output_path,
+        train_phase,
+        args.seed,
+        tokenizer,
+        args.max_seq_len,
+        sft_only_data_path=args.sft_only_data_path)
 
     # DataLoaders creation:
     if args.local_rank == -1:
