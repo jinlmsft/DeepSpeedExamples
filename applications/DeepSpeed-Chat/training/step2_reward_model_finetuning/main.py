@@ -44,8 +44,8 @@ def parse_args():
                         default='2,4,4',
                         help='Comma-separated list of proportions for training'
                         'phase 1, 2, and 3 data. For example the split `2,4,4`'
-                        'will use 60% of data for phase 1, 20% for phase 2'
-                        'and 20% for phase 3.')
+                        'will use 60%% of data for phase 1, 20%% for phase 2'
+                        'and 20%% for phase 3.')
     parser.add_argument(
         '--data_output_path',
         type=str,
@@ -161,6 +161,13 @@ def parse_args():
     parser.add_argument('--only_optimize_lora',
                         action='store_true',
                         help='Only optimize the LoRA parameters.')
+    ## Tensorboard logging
+    parser.add_argument('--enable_tensorboard',
+                        action='store_true',
+                        help='Enable tensorboard logging')
+    parser.add_argument('--tensorboard_path',
+                        type=str,
+                        default="step2_tensorboard")
     parser = deepspeed.add_config_arguments(parser)
     args = parser.parse_args()
 
@@ -187,10 +194,11 @@ def main():
 
     args.global_rank = torch.distributed.get_rank()
 
-    assert not args.offload, "zero-offload is not currently supported but coming soon!"
-
     ds_config = get_train_ds_config(offload=args.offload,
-                                    stage=args.zero_stage)
+                                    stage=args.zero_stage,
+                                    enable_tensorboard=args.enable_tensorboard,
+                                    tb_path=args.tensorboard_path,
+                                    tb_name="step2_model")
     ds_config[
         'train_micro_batch_size_per_gpu'] = args.per_device_train_batch_size
     ds_config[
@@ -203,7 +211,8 @@ def main():
 
     tokenizer = load_hf_tokenizer(args.model_name_or_path, fast_tokenizer=True)
     tokenizer.pad_token = tokenizer.eos_token
-
+    # make sure tokenizer is right pad in our logic
+    tokenizer.padding_side = 'right'
     rm_model = create_critic_model(args.model_name_or_path,
                                    tokenizer,
                                    ds_config,
